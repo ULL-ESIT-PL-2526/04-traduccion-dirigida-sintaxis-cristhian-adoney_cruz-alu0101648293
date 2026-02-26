@@ -142,7 +142,6 @@ describe('Parser Tests', () => {
   });
 
   describe('Floating point numbers', () => {
-
     test('should parse simple decimal numbers', () => {
       expect(parse("3.5")).toBe(3.5);
       expect(parse("0.1")).toBe(0.1);
@@ -182,7 +181,25 @@ describe('Parser Tests', () => {
     test('should handle negative exponent scientific notation', () => {
       expect(parse("1e-3")).toBeCloseTo(0.001);
     });
-
   });
 
+  describe('Multiline comments', () => {
+    test('should ignore multiline comment between numbers', () => {
+      expect(parse("3 /* comment */ + 4")).toBe(7);
+    });
+
+    test('should ignore multiline comment spanning lines', () => {
+      expect(parse(`
+        9
+        /* this is
+          a multiline
+          comment */
+        - 3
+      `)).toBe(6);
+    });
+
+    test('should ignore multiline comment inside expression', () => {
+      expect(parse("2 * /* hidden */ 5")).toBe(10);
+    });
+  });
 });

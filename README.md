@@ -15,17 +15,22 @@ Se recomienda trabajar desde tu máquina local conectándote de forma remota a l
 
 Una vez en el entorno de trabajo, compila y prueba que los test funcionen correctamente.
 
+Para compilar y probar test ejecute:
+
+- $ npx jison src/grammar.jison -o src/parser.js
+- $ npm test
+
 ```
 drwxrwxr-x 217 usuario usuario  12288 feb 25 09:58 node_modules
 -rw-rw-r--   1 usuario usuario   1258 feb 25 09:55 package.json
 -rw-rw-r--   1 usuario usuario 166986 feb 25 09:58 package-lock.json
 -rw-rw-r--   1 usuario usuario    971 feb 25 09:55 README.md
 drwxrwxr-x   2 usuario usuario   4096 feb 25 09:59 src
--rw-rw-r-- 1 usuario usuario   899 feb 25 09:55 grammar.jison
--rwxrwxr-x 1 usuario usuario   282 feb 25 09:55 index.js
--rw-rw-r-- 1 usuario usuario 21374 feb 25 09:59 parser.js
+  -rw-rw-r-- 1 usuario usuario   899 feb 25 09:55 grammar.jison
+  -rwxrwxr-x 1 usuario usuario   282 feb 25 09:55 index.js
+  -rw-rw-r-- 1 usuario usuario 21374 feb 25 09:59 parser.js
 drwxrwxr-x   2 usuario usuario   4096 feb 25 09:55 __tests__
--rw-rw-r-- 1 usuario usuario 4275 feb 25 09:55 parser.test.js
+  -rw-rw-r-- 1 usuario usuario 4275 feb 25 09:55 parser.test.js
 ```
 
 ### 2. Análisis de una gramática independiente del contexto en un fichero `.jison`
@@ -44,21 +49,21 @@ Sea un fichero `grammar.jison` donde se define:
 /lex
 ```
 
-/* skip whitespace */ ignora los espacios en blanco sin generar un token, mientras que devolver un token crea un elemento significativo para el parser.
+`\s+` ignora los espacios en blanco sin generar un token, mientras que devolver un token crea un elemento significativo para el parser.
 
-Los tokens generados por `123**45+@`, la secuencia de tokens generada será NUMBER: 123, OP: **, NUMBER: 45, OP: +, INVALID: @ y EOF.
+Los tokens generados por _123**45+@_, será NUMBER: 123, OP: **, NUMBER: 45, OP: +, INVALID: @ y EOF.
 
-** debe aparecer antes porque si [-+*/] estuviera primero, al encontrar ** coincidiría con el primer * como un token OP y luego el segundo * como otro OP, en lugar de reconocer ** como un solo token.
+`**` debe aparecer antes porque si [-+*/] estuviera primero, al encontrar ** coincidiría con el primer * como un token OP y luego el segundo * como otro OP, en lugar de reconocer ** como un solo token.
 
-EOF se devuelve cuando se alcanza el final del archivo de entrada <<EOF>>, indicando que no hay más caracteres que procesar.
+`EOF` se devuelve cuando se alcanza el final del archivo de entrada <<<EOF>EOF>>, indicando que no hay más caracteres que procesar.
 
-La regla . captura cualquier carácter no reconocido por reglas anteriores y devuelve INVALID, permitiendo detectar errores léxicos en la entrada.
+La regla `.` captura cualquier carácter no reconocido por reglas anteriores y devuelve INVALID, permitiendo detectar errores léxicos en la entrada.
 
 ### 3. Añadir nuevas cadenas que ha de reconocer el lenguaje que representa la gramática independiente del contexto
 
 La expresión regular que representa las nuevas cadenas que ha de reconocer la nueva gramática es la siguiente:
 
-> \s+|\/\/[^\n]*
+> \s+|\/\/.*
 
 Estas son cadenas que especifican comentarios de una única línea.
 
@@ -70,7 +75,7 @@ La expresión regular original que reconoce número enteros es la siguiente:
 
 La nueva expresión regular que reconoce números enteros y decimales es la siguiente:
 
-> [0-9]+(\.[0-9]+)?([eE][+-][0-9]+)?
+> [0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?
 
 ### 5. Añadir pruebas para el proyecto
 
