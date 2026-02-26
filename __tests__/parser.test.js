@@ -110,7 +110,6 @@ describe('Parser Tests', () => {
       expect(() => parse("3 +")).toThrow();
       expect(() => parse("+ 3")).toThrow();
       expect(() => parse("3 + + 4")).toThrow();
-      expect(() => parse("3.5")).toThrow(); // Only integers are supported
     });
 
     test('should handle incomplete expressions', () => {
@@ -126,6 +125,64 @@ describe('Parser Tests', () => {
       expect(parse("10 - 4 - 3")).toBe(3);
       expect(parse("7 - 5 - 1")).toBe(1);
     });
+  });
+
+  describe('Single-line comments', () => {
+    test('should ignore comment after expression', () => {
+      expect(parse("3 + 5 // comment")).toBe(8);
+    });
+
+    test('should ignore full line comment', () => {
+      expect(parse("7 // only comment")).toBe(7);
+    });
+
+    test('should ignore comment with symbols', () => {
+      expect(parse("10 - 3 // + * / **")).toBe(7);
+    });
+  });
+
+  describe('Floating point numbers', () => {
+
+    test('should parse simple decimal numbers', () => {
+      expect(parse("3.5")).toBe(3.5);
+      expect(parse("0.1")).toBe(0.1);
+      expect(parse("10.0")).toBe(10.0);
+    });
+
+    test('should handle decimal addition', () => {
+      expect(parse("1.5 + 2.5")).toBe(4);
+    });
+
+    test('should handle decimal subtraction', () => {
+      expect(parse("5.5 - 2.2")).toBeCloseTo(3.3);
+    });
+
+    test('should handle decimal multiplication', () => {
+      expect(parse("2.5 * 4")).toBe(10);
+    });
+
+    test('should handle decimal division', () => {
+      expect(parse("7.5 / 2.5")).toBe(3);
+    });
+
+    test('should handle mixed integer and decimal operations', () => {
+      expect(parse("3 + 2.5")).toBe(5.5);
+      expect(parse("10 - 0.5")).toBe(9.5);
+    });
+
+    test('should handle small decimal values', () => {
+      expect(parse("0.0001 + 0.0002")).toBeCloseTo(0.0003);
+    });
+
+    test('should handle scientific notation', () => {
+      expect(parse("1e+3")).toBe(1000);
+      expect(parse("2e+2 + 1")).toBe(201);
+    });
+
+    test('should handle negative exponent scientific notation', () => {
+      expect(parse("1e-3")).toBeCloseTo(0.001);
+    });
+
   });
 
 });
