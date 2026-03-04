@@ -1,8 +1,7 @@
 /**
  * Jest tests for the Jison parser
- * 
  */
-const parse = require("../src/parser.js").parse;
+const { parse } = require('../src/parser');
 
 describe('Parser Tests', () => {
   describe('Basic number parsing', () => {
