@@ -2,12 +2,12 @@
 
 ## Procesadores de Lenguajes
 
-- Este repositorio contiene todo el trabajo desarrollado en la **práctica 04** de la asignatura **Procesadores de Lenguajes** del grado de Ingeniería Informática que se cursa en la Universidad de La Laguna. 
+- Este repositorio contiene todo el trabajo desarrollado en la **práctica 05** de la asignatura **Procesadores de Lenguajes** del grado de Ingeniería Informática que se cursa en la Universidad de La Laguna. 
 - A su vez, este informe documenta el trabajo realizado para la práctica.
 - Autor - _Cristhian Cruz Delgado_
 - Fecha - _19 Feb 2026_
 
-### 1. Configurar proyecto
+### 0. Configurar proyecto
 
 El desarrollo de la práctica ha sido trabajado en la máquina virtual **PL2526-30**.
 
@@ -21,130 +21,271 @@ Para compilar y probar test ejecute:
 - $ npm test
 
 ```
-drwxrwxr-x 217 usuario usuario  12288 feb 25 09:58 node_modules
--rw-rw-r--   1 usuario usuario   1258 feb 25 09:55 package.json
+drwxrwxr-x 217 usuario usuario 12288 feb 25 09:58 node_modules
+-rw-rw-r--   1 usuario usuario 1258 feb 25 09:55 package.json
 -rw-rw-r--   1 usuario usuario 166986 feb 25 09:58 package-lock.json
--rw-rw-r--   1 usuario usuario    971 feb 25 09:55 README.md
-drwxrwxr-x   2 usuario usuario   4096 feb 25 09:59 src
-  -rw-rw-r-- 1 usuario usuario   899 feb 25 09:55 grammar.jison
-  -rwxrwxr-x 1 usuario usuario   282 feb 25 09:55 index.js
+-rw-rw-r--   1 usuario usuario  971 feb 25 09:55 README.md
+drwxrwxr-x   2 usuario usuario 4096 feb 25 09:59 src
+  -rw-rw-r-- 1 usuario usuario  899 feb 25 09:55 grammar.jison
+  -rwxrwxr-x 1 usuario usuario  282 feb 25 09:55 index.js
   -rw-rw-r-- 1 usuario usuario 21374 feb 25 09:59 parser.js
-drwxrwxr-x   2 usuario usuario   4096 feb 25 09:55 __tests__
+drwxrwxr-x   2 usuario usuario 4096 feb 25 09:55 __tests__
   -rw-rw-r-- 1 usuario usuario 4275 feb 25 09:55 parser.test.js
+  -rw-rw-rw- 1 usuario usuario 3396 mar  5 16:10 prec.test.js
 ```
 
-### 2. Análisis de una gramática independiente del contexto en un fichero `.jison`
+### 1. Gramática, derivaciones y árboles
 
-Sea un fichero `grammar.jison` donde se define:
+Partiendo de la gramática que se va a estudiar en esta práctica y antes de ser implementada, 
+se han resuelto algunas derivaciones para comprobar el comportamiento de los operadores:
+
+* 4.0-2.0*3.0
+- L ⇒ E EOF
+  ⇒ E OPAD T EOF
+  ⇒ E OPAD T OPMU R EOF
+  ⇒ E OPAD T OPMU F EOF
+  ⇒ E OPAD T OPMU NUMBER EOF
+  ⇒ E OPAD F OPMU NUMBER EOF
+  ⇒ E OPAD NUMBER OPMU NUMBER EOF
+  ⇒ T OPAD NUMBER OPMU NUMBER EOF
+  ⇒ F OPAD NUMBER OPMU NUMBER EOF
+  ⇒ NUMBER OPAD NUMBER OPMU NUMBER EOF
+
+```mermaid
+graph TD
+
+E --> E1
+E --> OPAD["-"]
+E --> T
+
+E1 --> T1
+T1 --> R1
+R1 --> F1
+F1 --> NUMBER1["4.0"]
+
+T --> T2
+T --> OPMU["*"]
+T --> R2
+
+T2 --> R3
+R3 --> F2
+F2 --> NUMBER2["2.0"]
+
+R2 --> F3
+F3 --> NUMBER3["3.0"]
+```
+
+* 2\*\*3\*\*2
+- L ⇒ E EOF
+  ⇒ T EOF
+  ⇒ R EOF
+  ⇒ F OPOW R EOF
+  ⇒ NUMBER OPOW R EOF
+  ⇒ NUMBER OPOW F OPOW R EOF
+  ⇒ NUMBER OPOW NUMBER OPOW R EOF
+  ⇒ NUMBER OPOW NUMBER OPOW F EOF
+  ⇒ NUMBER OPOW NUMBER OPOW NUMBER EOF
+
+```mermaid
+graph TD
+
+L --> E
+L --> EOF
+
+E --> T
+T --> R
+
+R --> F1
+R --> OPOW
+R --> R2
+
+F1 --> NUMBER1["2"]
+
+R2 --> F2
+R2 --> OPOW
+R2 --> R3
+
+F2 --> NUMBER2["3"]
+
+R3 --> F3
+F3 --> NUMBER3["2"]
+```
+
+* 7-4/2
+L ⇒ E EOF
+  ⇒ E OPAD T EOF
+  ⇒ E OPAD T OPMU R EOF
+  ⇒ E OPAD T OPMU F EOF
+  ⇒ E OPAD T OPMU NUMBER EOF
+  ⇒ E OPAD R OPMU NUMBER EOF
+  ⇒ E OPAD F OPMU NUMBER EOF
+  ⇒ E OPAD NUMBER OPMU NUMBER EOF
+  ⇒ T OPAD NUMBER OPMU NUMBER EOF
+  ⇒ F OPAD NUMBER OPMU NUMBER EOF
+  ⇒ NUMBER OPAD NUMBER OPMU NUMBER EOF
+
+```mermaid
+graph TD;
+
+L --> E
+L --> EOF
+
+E --> E1
+E --> OPAD
+E --> T
+
+E1 --> T1
+T1 --> R1
+R1 --> F1
+F1 --> NUMBER1["7"]
+
+T --> T2
+T --> OPMU
+T --> R2
+
+T2 --> R3
+R3 --> F2
+F2 --> NUMBER2["4"]
+
+R2 --> F3
+F3 --> NUMBER3["2"]
+```
+
+### 2. Análisis de una gramática independiente del contexto en un fichero **.jison**
+
+Sea un fichero `grammar.jison` donde se define el siguiente parser:
 
 ```
-%lex
+%start L
+%token NUMBER OPOW OPAD OPMU EOF INVALID
 %%
-\s+ { /* skip whitespace */; }
-[0-9]+ { return 'NUMBER'; }
-"**" { return 'OP'; }
-[-+*/] { return 'OP'; }
-<<EOF>> { return 'EOF'; }
-. { return 'INVALID'; }
-/lex
+
+L
+    : E EOF
+        { return $E; }
+    ;
+
+E
+    : E OPAD T
+        { $$ = operate($OPAD, $E, $T); }
+    | T
+        { $$ = $T; }
+    ;
+
+T
+    : T OPMU R
+        { $$ = operate($OPMU, $T, $R); }
+    | R
+        { $$ = $R; }
+    ;
+
+R
+    : F OPOW R
+        { $$ = operate($OPOW, $F, $R); }
+    | F
+        { $$ = $F; }
+    ;
+
+F
+    : NUMBER
+        { $$ = Number($NUMBER); }
+    | '(' E ')'
+        { $$ = $E; }
+    ;
+%%
 ```
 
-`\s+` ignora los espacios en blanco sin generar un token, mientras que devolver un token crea un elemento significativo para el parser.
+Asociatividad de los operadores
 
-Los tokens generados por _123**45+@_, será NUMBER: 123, OP: **, NUMBER: 45, OP: +, INVALID: @ y EOF.
+Los operadores OPAD y OPMU son asociativos por la izquierda, ya que sus producciones son recursivas por la izquierda:
 
-`**` debe aparecer antes porque si [-+*/] estuviera primero, al encontrar ** coincidiría con el primer * como un token OP y luego el segundo * como otro OP, en lugar de reconocer ** como un solo token.
+- E → E OPAD T
+- T → T OPMU R
 
-`EOF` se devuelve cuando se alcanza el final del archivo de entrada <<<EOF>EOF>>, indicando que no hay más caracteres que procesar.
+Esto implica que las expresiones se agrupan de izquierda a derecha.
+Por otro lado, el operador OPOW es asociativo por la derecha, ya que su producción es recursiva por la derecha:
 
-La regla `.` captura cualquier carácter no reconocido por reglas anteriores y devuelve INVALID, permitiendo detectar errores léxicos en la entrada.
+- R → F OPOW R
 
-### 3. Añadir nuevas cadenas que ha de reconocer el lenguaje que representa la gramática independiente del contexto
+Esto implica que las expresiones se agrupan de derecha a izquierda.
+La precedencia de los operadores viene determinada por la estructura jerárquica de los no terminales en la gramática.
 
-La expresión regular que representa las nuevas cadenas que ha de reconocer la nueva gramática es la siguiente:
+- E → T
+- T → R
+- R → F
 
-> \s+|\/\/.*
+Esto implica que las operaciones definidas en niveles más profundos del árbol sintáctico tienen mayor precedencia.
+Por lo tanto, cuanto más profundo aparece un operador en el árbol sintáctico, mayor precedencia tiene en la evaluación de la expresión.
 
-Estas son cadenas que especifican comentarios de una única línea.
-
-### 4. Modificación de una expresión regular que ya reconoce el lenguaje que representa la gramática independiente del contexto
-
-La expresión regular original que reconoce número enteros es la siguiente:
-
-> [0-9]+
-
-La nueva expresión regular que reconoce números enteros y decimales es la siguiente:
-
-> [0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?
-
-### 5. Añadir pruebas para el proyecto
+### 3. Añadir pruebas para probar asociatividad y precendencia
 
 Pruebas añadidas:
 
 ```JavaScript
-describe('Single-line comments', () => {
-  test('should ignore comment after expression', () => {
-    expect(parse("3 + 5 // comment")).toBe(8);
+  test('should handle multiplication before addition', () => {
+    expect(parse("2 + 3 * 4")).toBe(14);        // 2 + (3 * 4) = 14
+    expect(parse("2 * 3 + 4")).toBe(10);        // (2 * 3) + 4 = 10
+    expect(parse("2 + 3 * 4 + 5")).toBe(19);    // 2 + (3 * 4) + 5 = 19
   });
+  test('should handle left associativity for subtraction and division', () => {
+    expect(parse("10 - 3 - 2")).toBe(5);        // (10 - 3) - 2 = 5
+    expect(parse("10 / 2 / 5")).toBe(1);        // (10 / 2) / 5 = 1
+  });
+  test('should handle right associativity for exponentiation', () => {
+    expect(parse("2 ** 3 ** 2")).toBe(512);     // 2 ** (3 ** 2) = 512
+    expect(parse("(2 ** 3) ** 2")).toBe(64);    // (2 ** 3) ** 2 = 64
+  });
+  test('should handle decimal numbers and scientific notation', () => {
+    expect(parse("2.5 * 2")).toBeCloseTo(5);    // 2.5 * 2 = 5
+    expect(parse("1.5 + 2.5")).toBeCloseTo(4);  // 1.5 + 2.5 = 4
+    expect(parse("2e2 + 1")).toBeCloseTo(201);  // 2e2 + 1 = 201
+  });
+```
 
-  test('should ignore full line comment', () => {
-    expect(parse("7 // only comment")).toBe(7);
-  });
+### 4. Adición de expresiones regulares para el lenguaje que representa la gramática independiente del contexto
 
-  test('should ignore comment with symbols', () => {
-    expect(parse("10 - 3 // + * / **")).toBe(7);
-  });
-});
+Sea un fichero `grammar.jison` donde se define el siguiente parser:
 
-describe('Floating point numbers', () => {
-  test('should parse simple decimal numbers', () => {
-    expect(parse("3.5")).toBe(3.5);
-    expect(parse("0.1")).toBe(0.1);
-    expect(parse("10.0")).toBe(10.0);
-  });
+```
+lex
+%%
+\s+|\/\/.*|\/\*[\s\S]*\*\/            { /* skips */;      }
+[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?   { return 'NUMBER';  }
+"**"                                  { return 'OPOW';    }
+[*/]                                  { return 'OPMU';    }
+[-+]                                  { return 'OPAD';    }
+"("                                   { return '(';       }
+")"                                   { return ')';       }
+<<EOF>>                               { return 'EOF';     }
+.                                     { return 'INVALID'; }
+/lex
+``` 
 
-  test('should handle decimal addition', () => {
-    expect(parse("1.5 + 2.5")).toBe(4);
-  });
+Se han añadido las nuevas expresiones regulares:
 
-  test('should handle decimal subtraction', () => {
-    expect(parse("5.5 - 2.2")).toBeCloseTo(3.3);
-  });
+- `"("`
+- `")"`
 
-  test('should handle decimal multiplication', () => {
-    expect(parse("2.5 * 4")).toBe(10);
-  });
+### 5. Añadir más pruebas para el proyecto
 
-  test('should handle decimal division', () => {
-    expect(parse("7.5 / 2.5")).toBe(3);
-  });
+Pruebas añadidas:
 
-  test('should handle mixed integer and decimal operations', () => {
-    expect(parse("3 + 2.5")).toBe(5.5);
-    expect(parse("10 - 0.5")).toBe(9.5);
-  });
-
-  test('should handle small decimal values', () => {
-    expect(parse("0.0001 + 0.0002")).toBeCloseTo(0.0003);
-  });
-
-  test('should handle scientific notation', () => {
-    expect(parse("1e+3")).toBe(1000);
-    expect(parse("2e+2 + 1")).toBe(201);
-  });
-
-  test('should handle negative exponent scientific notation', () => {
-    expect(parse("1e-3")).toBeCloseTo(0.001);
-  });
+```JavaScript
+test('should handle parentheses correctly', () => {
+  expect(parse("(2 + 3) * 4")).toBe(20);           // (2 + 3) * 4 = 20
+  expect(parse("2 * (3 + 4)")).toBe(14);           // 2 * (3 + 4) = 14
+  expect(parse("(2 + 3) * (4 + 1)")).toBe(25);     // (2 + 3) * (4 + 1) = 25
+  expect(parse("(1.5 + 2.5) * 2")).toBeCloseTo(8); // (1.5 + 2.5) * 2 = 8
 });
 ```
 
 # Conclusiones del informe
 
-En este informe se han cumplido con esta lista de objetivos
+En este informe se ha cumplido con esta lista de objetivos
 
-1. Configurar proyecto
-2. Análisis de una gramática independiente del contexto en un fichero `.jison`
-3. Añadir nuevas cadenas que ha de reconocer el lenguaje
-4. Modificación de una expresión regular que ya reconoce el lenguaje
-5. Añadir pruebas para el proyecto
+0. Configurar proyecto
+1. Gramática, derivaciones y árboles
+2. Análisis de una gramática independiente del contexto en un fichero **.jison**
+3. Añadir pruebas para probar asociatividad y precendencia
+4. Adición de expresiones regulares para el lenguaje que representa la gramática independiente del contexto
+5. Añadir más pruebas para el proyecto
